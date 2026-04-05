@@ -1,4 +1,4 @@
-name: Beast Machine - Absolute Final Fix
+name: Beast Machine - Final Corrected
 
 on:
   workflow_dispatch:
@@ -30,22 +30,22 @@ jobs:
           echo "$RCLONE_CONF_DATA" | sudo tee /root/.config/rclone/rclone.conf > /dev/null
           sudo chmod 600 /root/.config/rclone/rclone.conf
 
-      - name: "৩. Playit সেটআপ (Sudo Bash Method)"
+      - name: "৩. Playit সেটআপ (Corrected Argument)"
         env:
           PLAYIT_CONF_DATA: ${{ secrets.PLAYIT_CONFIG }}
         run: |
-          # ১. রুট ডিরেক্টরিতে প্লে-ইট ডাউনলোড
+          # রুট ডিরেক্টরিতে প্লে-ইট ডাউনলোড
           sudo wget -q -O /root/playit https://github.com/playit-cloud/playit-agent/releases/download/v0.16.5/playit-linux-amd64
           sudo chmod +x /root/playit
           
-          # ২. কনফিগ ফোল্ডার ও ফাইল তৈরি
+          # কনফিগ ফোল্ডার ও ফাইল তৈরি
           sudo mkdir -p /root/.config/playit_gg
           echo "$PLAYIT_CONF_DATA" | sudo tee /root/.config/playit_gg/playit.toml > /dev/null
           
-          # ৩. ব্যাকগ্রাউন্ডে চালু (Bash -c ব্যবহার করা হয়েছে যাতে লগ ফাইলে পারমিশন পায়)
-          sudo bash -c "nohup /root/playit --secret-path /root/.config/playit_gg/playit.toml > /root/playit.log 2>&1 &"
+          # ব্যাকগ্রাউন্ডে চালু (এখান `--secret_path` ব্যবহার করা হয়েছে)
+          sudo bash -c "nohup /root/playit --secret_path /root/.config/playit_gg/playit.toml > /root/playit.log 2>&1 &"
           sleep 5
-          echo "Playit সফলভাবে চালু হয়েছে!"
+          echo "Playit এখন সঠিক আর্গুমেন্ট নিয়ে চালু হয়েছে!"
 
       - name: "৪. SSH ও পাসওয়ার্ড ফিক্স (User: root | Pass: root)"
         run: |
@@ -58,11 +58,11 @@ jobs:
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           
           sudo systemctl restart ssh
-          echo "টার্মিনাস এক্সেস এখন ওপেন!"
+          echo "মেশিন এখন SSH এর জন্য রেডি!"
 
       - name: "৫. ৫ মিনিটের টেস্টিং উইন্ডো"
         run: |
-          echo "মেশিন এখন সচল। লগ দেখতে লিখুন: sudo cat /root/playit.log"
+          echo "লগ চেক করতে লিখুন: sudo cat /root/playit.log"
           sleep 300 
 
       - name: "৬. ওরোবোরোস লুপ ট্রিগার"
