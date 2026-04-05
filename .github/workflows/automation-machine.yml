@@ -1,4 +1,4 @@
-name: Beast Machine - Final Adoptium & Rclone Fix
+name: Beast Machine - Final Secured Version
 
 on:
   workflow_dispatch:
@@ -15,59 +15,40 @@ jobs:
     steps:
       - name: "১. জাভা ২১ ইনস্টল (Adoptium Method)"
         run: |
-          # রিপোজিটরি সেটআপ
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
-          
-          # ইনস্টলেশন
           sudo apt update -y
           sudo apt install temurin-21-jre -y
-          
-          # জাভা ১৭ ডিফল্ট থাকে, তাই ২১-এ সুইচ করা হচ্ছে
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
-          echo "Java Version Check:"
           java -version
 
-      - name: "২. Rclone ইনস্টল ও কনফিগ ইনজেকশন (Fixed EOF Method)"
+      - name: "২. Rclone ইনস্টল ও নিরাপদ কনফিগ সেটআপ"
         run: |
-          # আর-ক্লোন ইনস্টল
           curl https://rclone.org/install.sh | sudo bash
-          
-          # রুট ইউজার কনফিগ ডিরেক্টরি
           sudo mkdir -p /root/.config/rclone
           
-          # সরাসরি কনফিগ ইনজেকশন (যাতে টোকেন না ভাঙে)
+          # এখানে সরাসরি টোকেন না দিয়ে সিক্রেট ব্যবহার করা হচ্ছে
           sudo bash -c "cat << 'EOF' > /root/.config/rclone/rclone.conf
-          [gdrive]
-          type = drive
-          scope = drive
-          token = {\"access_token\":\"ya29.a0Aa7MYir1m7QTdK3zcgKLTYGRKah1aJ23aWIwjHmoRauhUtDA88QbHmiRAoP6JEpCcHKZ8yYkpZ0nT20nFzUD2sq42NdIoTJFzlA7paBAXAxXLMsBfttJAI0x8SYttBjS35EpPoPrJgcUl3kzbI9P7P7n-fBA3y0-v2j7NwpS4rj8OQIv4MnYltbgGWOZVaLvVRaMS7JUaCgYKAaMSARYSFQHGX2MioKi-DnVTPFlGcOpzx-z1gQ0207\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//0gFooOb4Xc2xRCgYIARAAGBASNgF-L9Irt5dLyQlmieevrhtf08Af9J_i3lt4h8w46hg8-rCWMURXHDawjTw4ojYkp0I6FX6stw\",\"expiry\":\"2026-03-29T21:04:05.443077182+06:00\",\"expires_in\":3599}
-          team_drive = 
+          ${{ secrets.RCLONE_CONFIG }}
           EOF"
           
           sudo chmod 600 /root/.config/rclone/rclone.conf
-          echo "Rclone Config setup completed for Root!"
+          echo "Rclone Config setup completed safely!"
 
       - name: "৩. Tailscale ও SSH রুট এক্সেস"
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
-          
-          # SSH পাসওয়ার্ড ও রুট লগইন পারমিশন
           echo "root:root" | sudo chpasswd
-          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
           sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
-          echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: "৪. ৫ মিনিটের টেস্টিং ও ভেরিফিকেশন"
+      - name: "৪. ৫ মিনিটের টেস্টিং উইন্ডো"
         run: |
-          echo "মেশিন এখন পুরোপুরি সচল।"
-          echo "১. জাভা ২১ কনফার্ম করুন: java -version"
-          echo "২. ড্রাইভ কানেকশন চেক: rclone lsd gdrive:"
+          echo "মেশিন রেডি। rclone lsd gdrive: দিয়ে চেক করুন।"
           sleep 300 
 
-      - name: "৫. পরবর্তী মেশিনের জন্য ওরোবোরোস ট্রিগার"
+      - name: "৫. লুপ ট্রিগার"
         run: |
           curl -X POST \
             -H "Authorization: token ${{ secrets.GH_PAT }}" \
