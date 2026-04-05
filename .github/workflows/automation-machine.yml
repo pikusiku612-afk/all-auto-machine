@@ -1,4 +1,4 @@
-name: Beast Machine - Safe Sync & 1 Hour Limit
+name: Beast Machine - Safe Sync & Pro Logging
 
 on:
   workflow_dispatch:
@@ -25,12 +25,10 @@ jobs:
           RCLONE_CONF_DATA: ${{ secrets.RCLONE_CONFIG }}
           PLAYIT_CONF_DATA: ${{ secrets.PLAYIT_CONFIG }}
         run: |
-          # Rclone Setup
           curl https://rclone.org/install.sh | sudo bash
           sudo mkdir -p /root/.config/rclone
           echo "$RCLONE_CONF_DATA" | sudo tee /root/.config/rclone/rclone.conf > /dev/null
           
-          # Playit Setup (Corrected Argument)
           sudo wget -q -O /root/playit https://github.com/playit-cloud/playit-agent/releases/download/v0.16.5/playit-linux-amd64
           sudo chmod +x /root/playit
           sudo mkdir -p /root/.config/playit_gg
@@ -47,28 +45,34 @@ jobs:
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           sudo systemctl restart ssh
 
-      - name: "৪. অটো-সিঙ্ক স্ক্রিপ্ট (Wait for Flag)"
+      - name: "৪. অটো-সিঙ্ক স্ক্রিপ্ট (Wait for Flag & Pro Logging)"
         run: |
+          # 'EOF' ব্যবহার করার কারণে ভেতরের কোড একদম হুবহু সেভ হবে
           sudo bash -c "cat << 'EOF' > /root/sync.sh
           #!/bin/bash
-          LOG_FILE='/root/sync.log'
-          FLAG_FILE='/root/ready.txt'
+          
+          LOG_FILE=\"/root/sync.log\"
+          FLAG_FILE=\"/root/ready.txt\"
 
-          # ডাউনলোড শেষ না হওয়া পর্যন্ত অপেক্ষা করবে (Green Signal)
+          # ডাউনলোড ১০০% শেষ না হওয়া পর্যন্ত অপেক্ষা করবে (Green Signal)
           while [ ! -f \"\$FLAG_FILE\" ]; do
             sleep 10
           done
 
+          # আপনার দেওয়া জোস লগ আর্কিটেকচার
           echo \"=========================================\" >> \"\$LOG_FILE\"
-          echo \"🚀 Background Sync Started at \$(date)\" >> \"\$LOG_FILE\"
+          echo \"🚀 Background Sync Auto-Started at \$(date '+%Y-%m-%d %H:%M:%S')\" >> \"\$LOG_FILE\"
           echo \"=========================================\" >> \"\$LOG_FILE\"
 
           while true; do
             if [ \"\$(ls -A /mnt/ramdisk)\" ]; then
+              echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] 🔄 Sync Started: Copying RAM Disk to Google Drive...\" >> \"\$LOG_FILE\"
               rclone sync /mnt/ramdisk gdrive:MC_Data --transfers=16 --checkers=16 --drive-chunk-size=128M --buffer-size=256M --fast-list --use-mmap
-              echo \"[\$(date)] ✅ Sync Completed successfully.\" >> \"\$LOG_FILE\"
+              echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] ✅ Sync Completed successfully.\" >> \"\$LOG_FILE\"
+              echo \"-----------------------------------------\" >> \"\$LOG_FILE\"
             else
-              echo \"[\$(date)] ⚠️ ALERT: RAM Disk is EMPTY! Sync aborted.\" >> \"\$LOG_FILE\"
+              echo \"[\$(date '+%Y-%m-%d %H:%M:%S')] ⚠️ ALERT: RAM Disk is EMPTY! Sync aborted.\" >> \"\$LOG_FILE\"
+              echo \"-----------------------------------------\" >> \"\$LOG_FILE\"
             fi
             sleep 60
           done
@@ -79,15 +83,12 @@ jobs:
       - name: "৫. ডেটা ডাউনলোড শুরু (SSD Mode with Success Flag)"
         run: |
           sudo mkdir -p /mnt/ramdisk
-          # ডাউনলোড ১০০% সফল হলে তবেই ready.txt তৈরি হবে (&& touch /root/ready.txt)
           sudo bash -c "nohup rclone copy gdrive:MC_Data /mnt/ramdisk --transfers=128 --checkers=128 --multi-thread-streams=16 --drive-chunk-size=256M --buffer-size=1G --fast-list --use-mmap --drive-acknowledge-abuse -P --stats-one-line -v > /root/copy.log 2>&1 && touch /root/ready.txt &"
           echo "৩ জিবি ডেটা কপি শুরু হয়েছে। প্রগ্রেস দেখতে: tail -f /root/copy.log"
 
       - name: "৬. ১ ঘণ্টার লাইভ উইন্ডো ও ফাইনাল সিঙ্ক"
         run: |
-          echo "মেশিন এখন ৩৬০০ সেকেন্ডের জন্য সচল।"
-          sleep 3540 # ৫৯ মিনিট অপেক্ষা করবে
-          
+          sleep 3540 
           echo "মেশিন বন্ধ হওয়ার আগে শেষবারের মতো সিঙ্ক হচ্ছে..."
           sudo rclone sync /mnt/ramdisk gdrive:MC_Data --transfers=16 --checkers=16 --drive-chunk-size=128M --buffer-size=256M --fast-list --use-mmap
           sleep 60
