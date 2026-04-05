@@ -1,4 +1,4 @@
-name: Beast Machine - Java 21, Rclone & Playit Ready
+name: Beast Machine - Final Full Fixed
 
 on:
   workflow_dispatch:
@@ -34,39 +34,41 @@ jobs:
         env:
           PLAYIT_CONF_DATA: ${{ secrets.PLAYIT_CONFIG }}
         run: |
-          # ১. রুট ডিরেক্টরিতে প্লে-ইট ডাউনলোড
-          cd /root
-          wget -q -O playit https://github.com/playit-cloud/playit-agent/releases/download/v0.16.5/playit-linux-amd64
-          chmod +x playit
+          # পারমিশন এরর এড়াতে সরাসরি sudo ব্যবহার করে /root এ ফাইল রাখা হচ্ছে
+          sudo wget -q -O /root/playit https://github.com/playit-cloud/playit-agent/releases/download/v0.16.5/playit-linux-amd64
+          sudo chmod +x /root/playit
           
-          # ২. কনফিগ ফোল্ডার তৈরি ও ফাইল ইনজেকশন
-          mkdir -p /root/.config/playit_gg
+          # কনফিগ ফোল্ডার ও ফাইল তৈরি
+          sudo mkdir -p /root/.config/playit_gg
           echo "$PLAYIT_CONF_DATA" | sudo tee /root/.config/playit_gg/playit.toml > /dev/null
           
-          # ৩. ব্যাকগ্রাউন্ডে চালু ও লগ তৈরি
-          nohup ./playit --secret-path /root/.config/playit_gg/playit.toml > /root/playit.log 2>&1 &
+          # ব্যাকগ্রাউন্ডে চালু ও লগ ফাইল তৈরি
+          sudo nohup /root/playit --secret-path /root/.config/playit_gg/playit.toml > /root/playit.log 2>&1 &
           sleep 5
-          echo "Playit ব্যাকগ্রাউন্ডে চালু হয়েছে। লগ দেখতে 'cat /root/playit.log' ব্যবহার করুন।"
+          echo "Playit এখন ব্যাকগ্রাউন্ডে চলছে!"
 
-      - name: "৪. SSH এক্সেস (User: root | Pass: root)"
+      - name: "৪. SSH ও পাসওয়ার্ড ফিক্স (User: root | Pass: root)"
         run: |
+          # পাসওয়ার্ড সেট করা
           echo "root:root" | sudo chpasswd
+          
+          # SSH কনফিগারেশন আপডেট (Terminus এর জন্য)
           sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
           sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo sed -i 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
           
+          # টেলস্কেল কানেক্ট
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           
+          # সার্ভিস রিস্টার্ট
           sudo systemctl restart ssh
-          echo "মেশিন এখন SSH এর জন্য প্রস্তুত"
+          echo "SSH সার্ভার প্রস্তুত!"
 
       - name: "৫. ৫ মিনিটের টেস্টিং উইন্ডো"
         run: |
-          echo "সব সার্ভিস চেক করুন:"
-          echo "১. Java: java -version"
-          echo "২. Rclone: rclone lsd gdrive:"
-          echo "৩. Playit Log: cat /root/playit.log"
+          echo "মেশিন এখন সচল। আপনি এখন Terminus দিয়ে ঢুকতে পারেন।"
+          echo "প্লে-ইট লগ চেক করতে লিখুন: cat /root/playit.log"
           sleep 300 
 
       - name: "৬. ওরোবোরোস লুপ ট্রিগার"
