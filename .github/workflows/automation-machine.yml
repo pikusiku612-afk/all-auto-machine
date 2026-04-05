@@ -1,4 +1,4 @@
-name: Beast Machine - Final Corrected
+name: Beast Machine - Copy Test & 1 Hour Limit
 
 on:
   workflow_dispatch:
@@ -19,7 +19,6 @@ jobs:
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
           sudo apt update -y && sudo apt install temurin-21-jre -y
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
-          java -version
 
       - name: "২. Rclone কনফিগ ইনজেকশন"
         env:
@@ -34,20 +33,13 @@ jobs:
         env:
           PLAYIT_CONF_DATA: ${{ secrets.PLAYIT_CONFIG }}
         run: |
-          # রুট ডিরেক্টরিতে প্লে-ইট ডাউনলোড
           sudo wget -q -O /root/playit https://github.com/playit-cloud/playit-agent/releases/download/v0.16.5/playit-linux-amd64
           sudo chmod +x /root/playit
-          
-          # কনফিগ ফোল্ডার ও ফাইল তৈরি
           sudo mkdir -p /root/.config/playit_gg
           echo "$PLAYIT_CONF_DATA" | sudo tee /root/.config/playit_gg/playit.toml > /dev/null
-          
-          # ব্যাকগ্রাউন্ডে চালু (এখান `--secret_path` ব্যবহার করা হয়েছে)
           sudo bash -c "nohup /root/playit --secret_path /root/.config/playit_gg/playit.toml > /root/playit.log 2>&1 &"
-          sleep 5
-          echo "Playit এখন সঠিক আর্গুমেন্ট নিয়ে চালু হয়েছে!"
 
-      - name: "৪. SSH ও পাসওয়ার্ড ফিক্স (User: root | Pass: root)"
+      - name: "৪. SSH ও Tailscale (সবার আগে এক্সেস)"
         run: |
           echo "root:root" | sudo chpasswd
           sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
@@ -58,14 +50,25 @@ jobs:
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           
           sudo systemctl restart ssh
-          echo "মেশিন এখন SSH এর জন্য রেডি!"
+          echo "মেশিন এখন SSH এর জন্য রেডি! আপনি টার্মিনাস দিয়ে ঢুকতে পারেন।"
 
-      - name: "৫. ৫ মিনিটের টেস্টিং উইন্ডো"
+      - name: "৫. ফোল্ডার তৈরি ও ব্যাকগ্রাউন্ড কপি (Sync ছাড়া)"
         run: |
-          echo "লগ চেক করতে লিখুন: sudo cat /root/playit.log"
-          sleep 300 
+          # ফোল্ডার তৈরি করা হলো
+          sudo mkdir -p /mnt/ramdisk
+          
+          # আপনার দেওয়া হাই-স্পিড আর-ক্লোন কমান্ডটি ব্যাকগ্রাউন্ডে চালু করা হলো
+          sudo bash -c "nohup rclone copy gdrive:MC_Data /mnt/ramdisk --transfers=128 --checkers=128 --multi-thread-streams=16 --drive-chunk-size=256M --buffer-size=1G --fast-list --use-mmap --drive-acknowledge-abuse -P --stats-one-line -v > /root/copy.log 2>&1 &"
+          
+          echo "৩ জিবি ডেটা কপি হওয়া শুরু করেছে!"
+          echo "লাইভ পার্সেন্টেজ দেখতে টার্মিনাসে লিখুন: tail -f /root/copy.log"
 
-      - name: "৬. ওরোবোরোস লুপ ট্রিগার"
+      - name: "৬. ১ ঘণ্টার (৩৬০০ সেকেন্ড) লাইভ উইন্ডো"
+        run: |
+          echo "মেশিন এখন ১ ঘণ্টার জন্য লাইভ।"
+          sleep 3600 
+
+      - name: "৭. ওরোবোরোস লুপ ট্রিগার (১ ঘণ্টা পর)"
         run: |
           curl -X POST \
             -H "Authorization: token ${{ secrets.GH_PAT }}" \
