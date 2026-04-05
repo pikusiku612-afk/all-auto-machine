@@ -1,4 +1,4 @@
-name: Foundation Beast Machine (Adoptium Java 21)
+name: Foundation Beast Machine (Fixed Path & Java)
 
 on:
   workflow_dispatch:
@@ -13,27 +13,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. Adoptium মেথডে Java 21 ইনস্টল"
+      - name: "১. Adoptium Java 21 ইনস্টল ও ফোর্স সেট"
         run: |
-          # আপনার দেওয়া নিখুঁত পদ্ধতি
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
           sudo apt update -y
           sudo apt install temurin-21-jre -y
-          java -version # এখানে কনফার্ম হওয়া যাবে
+          
+          # জাদুকরী লাইন: সিস্টেমকে বাধ্য করা হচ্ছে জাভা ২১ ব্যবহার করতে
+          sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
+          java -version
 
-      - name: "২. Rclone কানেকশন সেটআপ"
+      - name: "২. Rclone ইনস্টল ও Root কনফিগ সেটআপ"
         run: |
-          # Rclone ইনস্টল
           curl https://rclone.org/install.sh | sudo bash
-          # কনফিগ ফোল্ডার ও ফাইল তৈরি
-          mkdir -p ~/.config/rclone
-          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
-          # পারমিশন ঠিক করা
-          chmod 600 ~/.config/rclone/rclone.conf
-          echo "Rclone কনফিগ ফাইল সেটআপ শেষ!"
+          # এবার সরাসরি root এর ফোল্ডারে ফাইলটি বসাচ্ছি
+          sudo mkdir -p /root/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" | sudo tee /root/.config/rclone/rclone.conf > /dev/null
+          sudo chmod 600 /root/.config/rclone/rclone.conf
+          echo "Rclone কনফিগ সরাসরি /root/.config/rclone এ সেভ করা হয়েছে!"
 
-      - name: "৩. Tailscale ও SSH এক্সেস"
+      - name: "৩. Tailscale ও SSH (Root Access)"
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
@@ -44,7 +44,10 @@ jobs:
 
       - name: "৪. ৫ মিনিটের ভেরিফিকেশন রান"
         run: |
-          echo "টার্মিনাস দিয়ে ঢুকে 'java -version' এবং 'rclone listremotes' চেক করুন।"
+          echo "টার্মিনাস দিয়ে ঢুকুন এবং নিচের কমান্ডগুলো চেক করুন:"
+          echo "১. java -version (২১ দেখাবে)"
+          echo "২. ls -a /root/.config/rclone (ফাইলটি দেখাবে)"
+          echo "৩. rclone lsd gdrive: (ড্রাইভের ফোল্ডার দেখাবে)"
           sleep 300 
 
       - name: "৫. ওরোবোরোস লুপ ট্রিগার"
