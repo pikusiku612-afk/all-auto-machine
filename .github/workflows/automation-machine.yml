@@ -1,4 +1,4 @@
-name: Beast Machine - Safe Sync & Pro Logging
+name: Beast Machine - The Ultimate 6-Hour Loop
 
 on:
   workflow_dispatch:
@@ -13,11 +13,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. জাভা ২১ ও বেসিক সেটআপ"
+      - name: "১. জাভা ২১, Screen ও বেসিক সেটআপ"
         run: |
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
-          sudo apt update -y && sudo apt install temurin-21-jre -y
+          sudo apt update -y 
+          # মাইনক্রাফট চালানোর জন্য screen এবং জাভা ২১ একসাথে ইনস্টল করা হচ্ছে
+          sudo apt install temurin-21-jre screen -y
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
 
       - name: "২. Rclone ও Playit কনফিগারেশন"
@@ -45,21 +47,27 @@ jobs:
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           sudo systemctl restart ssh
 
-      - name: "৪. অটো-সিঙ্ক স্ক্রিপ্ট (Wait for Flag & Pro Logging)"
+      - name: "৪. অটো-সিঙ্ক ও Minecraft Start স্ক্রিপ্ট"
         run: |
-          # 'EOF' ব্যবহার করার কারণে ভেতরের কোড একদম হুবহু সেভ হবে
           sudo bash -c "cat << 'EOF' > /root/sync.sh
           #!/bin/bash
           
           LOG_FILE=\"/root/sync.log\"
           FLAG_FILE=\"/root/ready.txt\"
 
-          # ডাউনলোড ১০০% শেষ না হওয়া পর্যন্ত অপেক্ষা করবে (Green Signal)
+          # ডাউনলোড ১০০% শেষ না হওয়া পর্যন্ত অপেক্ষা করবে
           while [ ! -f \"\$FLAG_FILE\" ]; do
             sleep 10
           done
 
-          # আপনার দেওয়া জোস লগ আর্কিটেকচার
+          # ডাউনলোড শেষ! এবার মাইনক্রাফট সার্ভার Screen-এ চালু করা হবে
+          echo \"=========================================\" >> \"\$LOG_FILE\"
+          echo \"🎮 Starting Minecraft Server in Screen (mc)...\" >> \"\$LOG_FILE\"
+          chmod +x /mnt/ramdisk/real-pros-v3/start.sh
+          cd /mnt/ramdisk/real-pros-v3 && screen -dmS mc ./start.sh
+          echo \"✅ Minecraft Server is UP and running in background!\" >> \"\$LOG_FILE\"
+
+          # আপনার জোস লগিং আর্কিটেকচার দিয়ে অটো-সিঙ্ক শুরু
           echo \"=========================================\" >> \"\$LOG_FILE\"
           echo \"🚀 Background Sync Auto-Started at \$(date '+%Y-%m-%d %H:%M:%S')\" >> \"\$LOG_FILE\"
           echo \"=========================================\" >> \"\$LOG_FILE\"
@@ -80,16 +88,18 @@ jobs:
           sudo chmod +x /root/sync.sh
           sudo nohup /root/sync.sh > /dev/null 2>&1 &
 
-      - name: "৫. ডেটা ডাউনলোড শুরু (SSD Mode with Success Flag)"
+      - name: "৫. ডেটা ডাউনলোড শুরু (SSD Mode)"
         run: |
           sudo mkdir -p /mnt/ramdisk
           sudo bash -c "nohup rclone copy gdrive:MC_Data /mnt/ramdisk --transfers=128 --checkers=128 --multi-thread-streams=16 --drive-chunk-size=256M --buffer-size=1G --fast-list --use-mmap --drive-acknowledge-abuse -P --stats-one-line -v > /root/copy.log 2>&1 && touch /root/ready.txt &"
           echo "৩ জিবি ডেটা কপি শুরু হয়েছে। প্রগ্রেস দেখতে: tail -f /root/copy.log"
 
-      - name: "৬. ১ ঘণ্টার লাইভ উইন্ডো ও ফাইনাল সিঙ্ক"
+      - name: "৬. প্রায় ৬ ঘণ্টার (৫ ঘণ্টা ৫০ মিনিট) লাইভ উইন্ডো"
         run: |
-          sleep 3540 
-          echo "মেশিন বন্ধ হওয়ার আগে শেষবারের মতো সিঙ্ক হচ্ছে..."
+          echo "মেশিন এখন ২১০০০ সেকেন্ড (৫ ঘণ্টা ৫০ মিনিট) সচল থাকবে..."
+          sleep 21000 
+          
+          echo "মেশিন বন্ধ হওয়ার আগে শেষবারের মতো Force Sync হচ্ছে..."
           sudo rclone sync /mnt/ramdisk gdrive:MC_Data --transfers=16 --checkers=16 --drive-chunk-size=128M --buffer-size=256M --fast-list --use-mmap
           sleep 60
 
@@ -100,4 +110,3 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/dispatches \
             -d '{"event_type": "ouroboros_trigger"}'
-            
