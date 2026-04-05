@@ -1,11 +1,10 @@
-name: Foundation Beast Machine (Complete & Fixed)
+name: Beast Machine - Final Adoptium & Rclone Fix
 
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [ouroboros_trigger]
 
-# ট্রাফিক পুলিশ: যাতে ভুল করেও ২টা মেশিন একসাথে না চলে
 concurrency:
   group: beast-machine-lock
 
@@ -14,59 +13,62 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. Adoptium Java 21 ইনস্টল ও ডিফল্ট সেট করা"
+      - name: "১. জাভা ২১ ইনস্টল (Adoptium Method)"
         run: |
-          # রিপোজিটরি অ্যাড করা
+          # রিপোজিটরি সেটআপ
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+          
+          # ইনস্টলেশন
           sudo apt update -y
           sudo apt install temurin-21-jre -y
           
-          # সিস্টেমকে বাধ্য করা হচ্ছে জাভা ২১ ব্যবহার করতে (যাতে ১৭ এর ভূত না চাপে)
+          # জাভা ১৭ ডিফল্ট থাকে, তাই ২১-এ সুইচ করা হচ্ছে
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
-          echo "চেক করা হচ্ছে জাভা ভার্সন:"
+          echo "Java Version Check:"
           java -version
 
-      - name: "২. Rclone ইনস্টল ও কনফিগ ফিক্স (Root Access)"
+      - name: "২. Rclone ইনস্টল ও কনফিগ ইনজেকশন (Fixed EOF Method)"
         run: |
           # আর-ক্লোন ইনস্টল
           curl https://rclone.org/install.sh | sudo bash
           
-          # রুট ডিরেক্টরিতে কনফিগ ফোল্ডার তৈরি
+          # রুট ইউজার কনফিগ ডিরেক্টরি
           sudo mkdir -p /root/.config/rclone
           
-          # নিরাপদ পদ্ধতিতে কনফিগ ফাইল রাইট করা (EOF ব্যবহার করে যাতে JSON না ভাঙে)
+          # সরাসরি কনফিগ ইনজেকশন (যাতে টোকেন না ভাঙে)
           sudo bash -c "cat << 'EOF' > /root/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG }}
+          [gdrive]
+          type = drive
+          scope = drive
+          token = {\"access_token\":\"ya29.a0Aa7MYir1m7QTdK3zcgKLTYGRKah1aJ23aWIwjHmoRauhUtDA88QbHmiRAoP6JEpCcHKZ8yYkpZ0nT20nFzUD2sq42NdIoTJFzlA7paBAXAxXLMsBfttJAI0x8SYttBjS35EpPoPrJgcUl3kzbI9P7P7n-fBA3y0-v2j7NwpS4rj8OQIv4MnYltbgGWOZVaLvVRaMS7JUaCgYKAaMSARYSFQHGX2MioKi-DnVTPFlGcOpzx-z1gQ0207\",\"token_type\":\"Bearer\",\"refresh_token\":\"1//0gFooOb4Xc2xRCgYIARAAGBASNgF-L9Irt5dLyQlmieevrhtf08Af9J_i3lt4h8w46hg8-rCWMURXHDawjTw4ojYkp0I6FX6stw\",\"expiry\":\"2026-03-29T21:04:05.443077182+06:00\",\"expires_in\":3599}
+          team_drive = 
           EOF"
           
           sudo chmod 600 /root/.config/rclone/rclone.conf
-          echo "Rclone কনফিগ সফলভাবে /root ডিরেক্টরিতে সেটআপ হয়েছে!"
+          echo "Rclone Config setup completed for Root!"
 
-      - name: "৩. Tailscale ও SSH (Root login: root/root)"
+      - name: "৩. Tailscale ও SSH রুট এক্সেস"
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           
-          # SSH কনফিগারেশন ফিক্স
+          # SSH পাসওয়ার্ড ও রুট লগইন পারমিশন
           echo "root:root" | sudo chpasswd
           sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
           sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
           echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
-          echo "SSH এবং Tailscale কানেক্টেড!"
 
-      - name: "৪. ৫ মিনিটের টেস্টিং উইন্ডো"
+      - name: "৪. ৫ মিনিটের টেস্টিং ও ভেরিফিকেশন"
         run: |
-          echo "ওস্তাদ, মেশিন এখন পুরোপুরি রেডি!"
-          echo "টার্মিনাসে ঢুকে নিচের কমান্ডগুলো দিয়ে সব চেক করে নিন:"
-          echo "১. java -version (অবশ্যই ২১ হবে)"
-          echo "২. rclone lsd gdrive: (ড্রাইভের ফোল্ডার দেখাবে)"
+          echo "মেশিন এখন পুরোপুরি সচল।"
+          echo "১. জাভা ২১ কনফার্ম করুন: java -version"
+          echo "২. ড্রাইভ কানেকশন চেক: rclone lsd gdrive:"
           sleep 300 
 
-      - name: "৫. লুপ ট্রিগার (পরবর্তী মেশিনের জন্ম)"
+      - name: "৫. পরবর্তী মেশিনের জন্য ওরোবোরোস ট্রিগার"
         run: |
-          echo "চক্রাকার লুপ সচল রাখা হচ্ছে..."
           curl -X POST \
             -H "Authorization: token ${{ secrets.GH_PAT }}" \
             -H "Accept: application/vnd.github.v3+json" \
