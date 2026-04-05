@@ -1,11 +1,10 @@
-name: Foundation Beast Machine (5-Min Test)
+name: Foundation Beast Machine (Adoptium Java 21)
 
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [ouroboros_trigger]
 
-# ট্রাফিক পুলিশ (একের অধিক মেশিন চলতে দেবে না)
 concurrency:
   group: beast-machine-lock
 
@@ -14,44 +13,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. Adoptium Java 21 ইনস্টল"
+      - name: "১. Adoptium মেথডে Java 21 ইনস্টল"
         run: |
+          # আপনার দেওয়া নিখুঁত পদ্ধতি
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
           sudo apt update -y
           sudo apt install temurin-21-jre -y
+          java -version # এখানে কনফার্ম হওয়া যাবে
 
-      - name: "২. Rclone ইনস্টল ও কনফিগ"
+      - name: "২. Rclone কানেকশন সেটআপ"
         run: |
-          echo "Rclone ইনস্টল করা হচ্ছে..."
+          # Rclone ইনস্টল
           curl https://rclone.org/install.sh | sudo bash
-          echo "Rclone কনফিগ সেটআপ করা হচ্ছে..."
+          # কনফিগ ফোল্ডার ও ফাইল তৈরি
           mkdir -p ~/.config/rclone
           echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          # পারমিশন ঠিক করা
           chmod 600 ~/.config/rclone/rclone.conf
+          echo "Rclone কনফিগ ফাইল সেটআপ শেষ!"
 
-      - name: "৩. Tailscale কানেক্ট (Hostname: beast-machine)"
+      - name: "৩. Tailscale ও SSH এক্সেস"
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
-
-      - name: "৪. SSH Root Access (User: root, Pass: root)"
-        run: |
           echo "root:root" | sudo chpasswd
-          sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
           sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
-          sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
           echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: "৫. ৫ মিনিটের টেস্ট রান"
+      - name: "৪. ৫ মিনিটের ভেরিফিকেশন রান"
         run: |
-          echo "ওস্তাদ, মেশিন রেডি! টার্মিনাস দিয়ে ঢুকে Java 21 এবং Rclone চেক করুন।"
+          echo "টার্মিনাস দিয়ে ঢুকে 'java -version' এবং 'rclone listremotes' চেক করুন।"
           sleep 300 
 
-      - name: "৬. ওরোবোরোস ট্রিগার (পরবর্তী মেশিনের জন্ম)"
+      - name: "৫. ওরোবোরোস লুপ ট্রিগার"
         run: |
-          echo "নতুন মেশিনকে ডাকা হচ্ছে..."
           curl -X POST \
             -H "Authorization: token ${{ secrets.GH_PAT }}" \
             -H "Accept: application/vnd.github.v3+json" \
