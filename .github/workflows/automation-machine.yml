@@ -14,20 +14,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. সিস্টেম আপডেট ও Java 21 ইনস্টল"
+      - name: "১. Adoptium Java 21 ইনস্টল"
         run: |
-          echo "সিস্টেম আপডেট করা হচ্ছে..."
-          sudo apt-get update -y
-          echo "Java 21 এবং প্রয়োজনীয় টুলস ইনস্টল হচ্ছে..."
-          sudo apt-get install -y openjdk-21-jre-headless curl wget git unzip zip screen
-          echo "ইনস্টলেশন সফল!"
+          wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
+          echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
+          sudo apt update -y
+          sudo apt install temurin-21-jre -y
 
-      - name: "২. Tailscale কানেক্ট (Hostname: beast-machine)"
+      - name: "২. Rclone ইনস্টল ও কনফিগ"
+        run: |
+          echo "Rclone ইনস্টল করা হচ্ছে..."
+          curl https://rclone.org/install.sh | sudo bash
+          echo "Rclone কনফিগ সেটআপ করা হচ্ছে..."
+          mkdir -p ~/.config/rclone
+          echo "${{ secrets.RCLONE_CONFIG }}" > ~/.config/rclone/rclone.conf
+          chmod 600 ~/.config/rclone/rclone.conf
+
+      - name: "৩. Tailscale কানেক্ট (Hostname: beast-machine)"
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
 
-      - name: "৩. SSH Root Access (User: root, Pass: root)"
+      - name: "৪. SSH Root Access (User: root, Pass: root)"
         run: |
           echo "root:root" | sudo chpasswd
           sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
@@ -36,12 +44,12 @@ jobs:
           echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
 
-      - name: "৪. ৫ মিনিটের টেস্ট রান"
+      - name: "৫. ৫ মিনিটের টেস্ট রান"
         run: |
-          echo "ওস্তাদ, মেশিন রেডি! টার্মিনাস দিয়ে ঢুকে চেক করতে পারেন।"
+          echo "ওস্তাদ, মেশিন রেডি! টার্মিনাস দিয়ে ঢুকে Java 21 এবং Rclone চেক করুন।"
           sleep 300 
 
-      - name: "৫. ওরোবোরোস ট্রিগার (পরবর্তী মেশিনের জন্ম)"
+      - name: "৬. ওরোবোরোস ট্রিগার (পরবর্তী মেশিনের জন্ম)"
         run: |
           echo "নতুন মেশিনকে ডাকা হচ্ছে..."
           curl -X POST \
