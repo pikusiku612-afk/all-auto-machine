@@ -1,4 +1,4 @@
-name: Beast Machine - Password & Rclone Fixed
+name: Beast Machine - Perfect Final Fix
 
 on:
   workflow_dispatch:
@@ -21,37 +21,39 @@ jobs:
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
           java -version
 
-      - name: "২. Rclone নিরাপদ ইনজেকশন"
+      - name: "২. Rclone নিরাপদ ইনজেকশন (No Escape Required)"
+        env:
+          RCLONE_CONF_DATA: ${{ secrets.RCLONE_CONFIG }}
         run: |
           curl https://rclone.org/install.sh | sudo bash
           sudo mkdir -p /root/.config/rclone
-          sudo bash -c "cat << 'EOF' > /root/.config/rclone/rclone.conf
-          ${{ secrets.RCLONE_CONFIG }}
-          EOF"
+          # এনভায়রনমেন্ট ভেরিয়েবল ব্যবহার করে সরাসরি ফাইল রাইট করা
+          echo "$RCLONE_CONF_DATA" | sudo tee /root/.config/rclone/rclone.conf > /dev/null
           sudo chmod 600 /root/.config/rclone/rclone.conf
+          echo "Rclone কনফিগ সফলভাবে ইনজেক্ট হয়েছে!"
 
       - name: "৩. SSH ও পাসওয়ার্ড ফিক্স (User: root | Pass: root)"
         run: |
-          # পাসওয়ার্ড সেট করা
+          # পাসওয়ার্ড 'root' সেট করা
           echo "root:root" | sudo chpasswd
           
-          # SSH কনফিগারেশন পুরোপুরি ওভাররাইট করা যাতে ভুল না হয়
-          sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
-          sudo sed -i 's/PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          # SSH কনফিগারেশন নিখুঁতভাবে সেট করা যাতে Terminus পাসওয়ার্ড নেয়
+          sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
           
-          # টেলস্কেল ইনস্টল ও কানেক্ট
+          # টেলস্কেল কানেক্ট
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           
           # সার্ভিস রিস্টার্ট
           sudo systemctl restart ssh
-          echo "পাসওয়ার্ড 'root' এখন কার্যকর!"
+          echo "SSH পাসওয়ার্ড অথেন্টিকেশন এখন এনাবলড!"
 
-      - name: "৪. ৫ মিনিটের টেস্টিং সময়"
+      - name: "৪. ৫ মিনিটের লাইভ টেস্টিং"
         run: |
-          echo "Terminus এ গিয়ে User: root এবং Password: root দিয়ে ট্রাই করুন।"
+          echo "ওস্তাদ, এবার Terminus এ root/root দিয়ে ট্রাই করুন"
+          echo "ড্রাইভ চেক করতে লিখুন: rclone lsd gdrive:"
           sleep 300 
 
       - name: "৫. লুপ ট্রিগার"
