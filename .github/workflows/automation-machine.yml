@@ -1,0 +1,52 @@
+name: Foundation Beast Machine (5-Min Test)
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [ouroboros_trigger]
+
+# ট্রাফিক পুলিশ (একের অধিক মেশিন চলতে দেবে না)
+concurrency:
+  group: beast-machine-lock
+
+jobs:
+  beast-loop:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: "১. সিস্টেম আপডেট ও Java 21 ইনস্টল"
+        run: |
+          echo "সিস্টেম আপডেট করা হচ্ছে..."
+          sudo apt-get update -y
+          echo "Java 21 এবং প্রয়োজনীয় টুলস ইনস্টল হচ্ছে..."
+          sudo apt-get install -y openjdk-21-jre-headless curl wget git unzip zip screen
+          echo "ইনস্টলেশন সফল!"
+
+      - name: "২. Tailscale কানেক্ট (Hostname: beast-machine)"
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sh
+          sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
+
+      - name: "৩. SSH Root Access (User: root, Pass: root)"
+        run: |
+          echo "root:root" | sudo chpasswd
+          sudo sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+          sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+          sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+          echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
+          sudo systemctl restart ssh
+
+      - name: "৪. ৫ মিনিটের টেস্ট রান"
+        run: |
+          echo "ওস্তাদ, মেশিন রেডি! টার্মিনাস দিয়ে ঢুকে চেক করতে পারেন।"
+          sleep 300 
+
+      - name: "৫. ওরোবোরোস ট্রিগার (পরবর্তী মেশিনের জন্ম)"
+        run: |
+          echo "নতুন মেশিনকে ডাকা হচ্ছে..."
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GH_PAT }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/${{ github.repository }}/dispatches \
+            -d '{"event_type": "ouroboros_trigger"}'
+            
