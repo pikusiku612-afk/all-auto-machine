@@ -1,4 +1,4 @@
-name: Beast Machine - Perfect Final Fix
+name: Beast Machine - Java 21, Rclone & Playit Ready
 
 on:
   workflow_dispatch:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. জাভা ২১ ইনস্টল (Adoptium)"
+      - name: "১. জাভা ২১ ইনস্টল ও ডিফল্ট সেটআপ"
         run: |
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
@@ -21,42 +21,55 @@ jobs:
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
           java -version
 
-      - name: "২. Rclone নিরাপদ ইনজেকশন (No Escape Required)"
+      - name: "২. Rclone কনফিগ ইনজেকশন"
         env:
           RCLONE_CONF_DATA: ${{ secrets.RCLONE_CONFIG }}
         run: |
           curl https://rclone.org/install.sh | sudo bash
           sudo mkdir -p /root/.config/rclone
-          # এনভায়রনমেন্ট ভেরিয়েবল ব্যবহার করে সরাসরি ফাইল রাইট করা
           echo "$RCLONE_CONF_DATA" | sudo tee /root/.config/rclone/rclone.conf > /dev/null
           sudo chmod 600 /root/.config/rclone/rclone.conf
-          echo "Rclone কনফিগ সফলভাবে ইনজেক্ট হয়েছে!"
 
-      - name: "৩. SSH ও পাসওয়ার্ড ফিক্স (User: root | Pass: root)"
+      - name: "৩. Playit সেটআপ (ফোল্ডার: playit_gg)"
+        env:
+          PLAYIT_CONF_DATA: ${{ secrets.PLAYIT_CONFIG }}
         run: |
-          # পাসওয়ার্ড 'root' সেট করা
-          echo "root:root" | sudo chpasswd
+          # ১. রুট ডিরেক্টরিতে প্লে-ইট ডাউনলোড
+          cd /root
+          wget -q -O playit https://github.com/playit-cloud/playit-agent/releases/download/v0.16.5/playit-linux-amd64
+          chmod +x playit
           
-          # SSH কনফিগারেশন নিখুঁতভাবে সেট করা যাতে Terminus পাসওয়ার্ড নেয়
+          # ২. কনফিগ ফোল্ডার তৈরি ও ফাইল ইনজেকশন
+          mkdir -p /root/.config/playit_gg
+          echo "$PLAYIT_CONF_DATA" | sudo tee /root/.config/playit_gg/playit.toml > /dev/null
+          
+          # ৩. ব্যাকগ্রাউন্ডে চালু ও লগ তৈরি
+          nohup ./playit --secret-path /root/.config/playit_gg/playit.toml > /root/playit.log 2>&1 &
+          sleep 5
+          echo "Playit ব্যাকগ্রাউন্ডে চালু হয়েছে। লগ দেখতে 'cat /root/playit.log' ব্যবহার করুন।"
+
+      - name: "৪. SSH এক্সেস (User: root | Pass: root)"
+        run: |
+          echo "root:root" | sudo chpasswd
           sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
           sudo sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
           sudo sed -i 's/^#\?KbdInteractiveAuthentication.*/KbdInteractiveAuthentication yes/' /etc/ssh/sshd_config
           
-          # টেলস্কেল কানেক্ট
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
           
-          # সার্ভিস রিস্টার্ট
           sudo systemctl restart ssh
-          echo "SSH পাসওয়ার্ড অথেন্টিকেশন এখন এনাবলড!"
+          echo "মেশিন এখন SSH এর জন্য প্রস্তুত"
 
-      - name: "৪. ৫ মিনিটের লাইভ টেস্টিং"
+      - name: "৫. ৫ মিনিটের টেস্টিং উইন্ডো"
         run: |
-          echo "ওস্তাদ, এবার Terminus এ root/root দিয়ে ট্রাই করুন"
-          echo "ড্রাইভ চেক করতে লিখুন: rclone lsd gdrive:"
+          echo "সব সার্ভিস চেক করুন:"
+          echo "১. Java: java -version"
+          echo "২. Rclone: rclone lsd gdrive:"
+          echo "৩. Playit Log: cat /root/playit.log"
           sleep 300 
 
-      - name: "৫. লুপ ট্রিগার"
+      - name: "৬. ওরোবোরোস লুপ ট্রিগার"
         run: |
           curl -X POST \
             -H "Authorization: token ${{ secrets.GH_PAT }}" \
