@@ -1,10 +1,11 @@
-name: Foundation Beast Machine (Fixed Path & Java)
+name: Foundation Beast Machine (Complete & Fixed)
 
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [ouroboros_trigger]
 
+# ট্রাফিক পুলিশ: যাতে ভুল করেও ২টা মেশিন একসাথে না চলে
 concurrency:
   group: beast-machine-lock
 
@@ -13,45 +14,59 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. Adoptium Java 21 ইনস্টল ও ফোর্স সেট"
+      - name: "১. Adoptium Java 21 ইনস্টল ও ডিফল্ট সেট করা"
         run: |
+          # রিপোজিটরি অ্যাড করা
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
           sudo apt update -y
           sudo apt install temurin-21-jre -y
           
-          # জাদুকরী লাইন: সিস্টেমকে বাধ্য করা হচ্ছে জাভা ২১ ব্যবহার করতে
+          # সিস্টেমকে বাধ্য করা হচ্ছে জাভা ২১ ব্যবহার করতে (যাতে ১৭ এর ভূত না চাপে)
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
+          echo "চেক করা হচ্ছে জাভা ভার্সন:"
           java -version
 
-      - name: "২. Rclone ইনস্টল ও Root কনফিগ সেটআপ"
+      - name: "২. Rclone ইনস্টল ও কনফিগ ফিক্স (Root Access)"
         run: |
+          # আর-ক্লোন ইনস্টল
           curl https://rclone.org/install.sh | sudo bash
-          # এবার সরাসরি root এর ফোল্ডারে ফাইলটি বসাচ্ছি
+          
+          # রুট ডিরেক্টরিতে কনফিগ ফোল্ডার তৈরি
           sudo mkdir -p /root/.config/rclone
-          echo "${{ secrets.RCLONE_CONFIG }}" | sudo tee /root/.config/rclone/rclone.conf > /dev/null
+          
+          # নিরাপদ পদ্ধতিতে কনফিগ ফাইল রাইট করা (EOF ব্যবহার করে যাতে JSON না ভাঙে)
+          sudo bash -c "cat << 'EOF' > /root/.config/rclone/rclone.conf
+          ${{ secrets.RCLONE_CONFIG }}
+          EOF"
+          
           sudo chmod 600 /root/.config/rclone/rclone.conf
-          echo "Rclone কনফিগ সরাসরি /root/.config/rclone এ সেভ করা হয়েছে!"
+          echo "Rclone কনফিগ সফলভাবে /root ডিরেক্টরিতে সেটআপ হয়েছে!"
 
-      - name: "৩. Tailscale ও SSH (Root Access)"
+      - name: "৩. Tailscale ও SSH (Root login: root/root)"
         run: |
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
+          
+          # SSH কনফিগারেশন ফিক্স
           echo "root:root" | sudo chpasswd
           sudo sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+          sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
           echo "PermitRootLogin yes" | sudo tee -a /etc/ssh/sshd_config
           sudo systemctl restart ssh
+          echo "SSH এবং Tailscale কানেক্টেড!"
 
-      - name: "৪. ৫ মিনিটের ভেরিফিকেশন রান"
+      - name: "৪. ৫ মিনিটের টেস্টিং উইন্ডো"
         run: |
-          echo "টার্মিনাস দিয়ে ঢুকুন এবং নিচের কমান্ডগুলো চেক করুন:"
-          echo "১. java -version (২১ দেখাবে)"
-          echo "২. ls -a /root/.config/rclone (ফাইলটি দেখাবে)"
-          echo "৩. rclone lsd gdrive: (ড্রাইভের ফোল্ডার দেখাবে)"
+          echo "ওস্তাদ, মেশিন এখন পুরোপুরি রেডি!"
+          echo "টার্মিনাসে ঢুকে নিচের কমান্ডগুলো দিয়ে সব চেক করে নিন:"
+          echo "১. java -version (অবশ্যই ২১ হবে)"
+          echo "২. rclone lsd gdrive: (ড্রাইভের ফোল্ডার দেখাবে)"
           sleep 300 
 
-      - name: "৫. ওরোবোরোস লুপ ট্রিগার"
+      - name: "৫. লুপ ট্রিগার (পরবর্তী মেশিনের জন্ম)"
         run: |
+          echo "চক্রাকার লুপ সচল রাখা হচ্ছে..."
           curl -X POST \
             -H "Authorization: token ${{ secrets.GH_PAT }}" \
             -H "Accept: application/vnd.github.v3+json" \
