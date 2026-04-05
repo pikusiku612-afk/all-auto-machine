@@ -1,4 +1,4 @@
-name: Beast Machine - Final Secured Version
+name: Beast Machine - Password & Rclone Fixed
 
 on:
   workflow_dispatch:
@@ -13,39 +13,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. জাভা ২১ ইনস্টল (Adoptium Method)"
+      - name: "১. জাভা ২১ ইনস্টল (Adoptium)"
         run: |
           wget -qO - https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/adoptium.gpg > /dev/null
           echo "deb https://packages.adoptium.net/artifactory/deb $(awk -F= '/^VERSION_CODENAME/{print $2}' /etc/os-release) main" | sudo tee /etc/apt/sources.list.d/adoptium.list
-          sudo apt update -y
-          sudo apt install temurin-21-jre -y
+          sudo apt update -y && sudo apt install temurin-21-jre -y
           sudo update-alternatives --set java /usr/lib/jvm/temurin-21-jre-amd64/bin/java
           java -version
 
-      - name: "২. Rclone ইনস্টল ও নিরাপদ কনফিগ সেটআপ"
+      - name: "২. Rclone নিরাপদ ইনজেকশন"
         run: |
           curl https://rclone.org/install.sh | sudo bash
           sudo mkdir -p /root/.config/rclone
-          
-          # এখানে সরাসরি টোকেন না দিয়ে সিক্রেট ব্যবহার করা হচ্ছে
           sudo bash -c "cat << 'EOF' > /root/.config/rclone/rclone.conf
           ${{ secrets.RCLONE_CONFIG }}
           EOF"
-          
           sudo chmod 600 /root/.config/rclone/rclone.conf
-          echo "Rclone Config setup completed safely!"
 
-      - name: "৩. Tailscale ও SSH রুট এক্সেস"
+      - name: "৩. SSH ও পাসওয়ার্ড ফিক্স (User: root | Pass: root)"
         run: |
+          # পাসওয়ার্ড সেট করা
+          echo "root:root" | sudo chpasswd
+          
+          # SSH কনফিগারেশন পুরোপুরি ওভাররাইট করা যাতে ভুল না হয়
+          sudo sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          sudo sed -i 's/PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+          
+          # টেলস্কেল ইনস্টল ও কানেক্ট
           curl -fsSL https://tailscale.com/install.sh | sh
           sudo tailscale up --authkey=${{ secrets.TAILSCALE_AUTHKEY }} --hostname=beast-machine
-          echo "root:root" | sudo chpasswd
-          sudo sed -i 's/PermitRootLogin prohibit-password/PermitRootLogin yes/g' /etc/ssh/sshd_config
+          
+          # সার্ভিস রিস্টার্ট
           sudo systemctl restart ssh
+          echo "পাসওয়ার্ড 'root' এখন কার্যকর!"
 
-      - name: "৪. ৫ মিনিটের টেস্টিং উইন্ডো"
+      - name: "৪. ৫ মিনিটের টেস্টিং সময়"
         run: |
-          echo "মেশিন রেডি। rclone lsd gdrive: দিয়ে চেক করুন।"
+          echo "Terminus এ গিয়ে User: root এবং Password: root দিয়ে ট্রাই করুন।"
           sleep 300 
 
       - name: "৫. লুপ ট্রিগার"
