@@ -19,7 +19,7 @@ jobs:
           echo "🚀 ZRAM Setup শুরু হচ্ছে..."
           sudo apt update
           sudo apt install linux-modules-extra-$(uname -r) zram-tools -y
-          echo "PERCENT=80" | sudo tee /etc/default/zramswap
+          echo "PERCENT=80\nALGO=zstd" | sudo tee /etc/default/zramswap
           sudo systemctl restart zramswap.service
           zramctl
           
