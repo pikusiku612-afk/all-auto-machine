@@ -13,8 +13,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: "১. সিস্টেম বুস্ট (ZRAM), জাভা ২১ ও Screen সেটআপ"
+      - name: "১. সিস্টেম বুস্ট (ZRAM, Timezone), জাভা ২১ ও Screen সেটআপ"
         run: |
+          # সবার আগে টাইমজোন ঢাকা করা হলো
+          sudo timedatectl set-timezone Asia/Dhaka
+          echo "⏰ বর্তমান সময় (ঢাকা): $(date)"
           # আপনার দেওয়া ZRAM সুপারচার্জ কমান্ড
           echo "🚀 ZRAM Setup শুরু হচ্ছে..."
           sudo apt update
