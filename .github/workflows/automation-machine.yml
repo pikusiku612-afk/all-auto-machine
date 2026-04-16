@@ -105,10 +105,10 @@ jobs:
           sudo bash -c "nohup rclone copy gdrive:MC_Data /mnt/ramdisk --transfers=128 --checkers=128 --multi-thread-streams=16 --drive-chunk-size=256M --buffer-size=1G --fast-list --use-mmap --drive-acknowledge-abuse -P --stats-one-line -v > /root/copy.log 2>&1 && touch /root/ready.txt &"
           echo "৩ জিবি ডেটা কপি শুরু হয়েছে। প্রগ্রেস দেখতে: tail -f /root/copy.log"
 
-      - name: "৬. প্রায় ৬ ঘণ্টার (৫ ঘণ্টা ৫০ মিনিট) লাইভ উইন্ডো"
+      - name: "৬. প্রায় ৬ ঘণ্টার (৫ ঘণ্টা ৪০ মিনিট) লাইভ উইন্ডো"
         run: |
-          echo "মেশিন এখন ২১০০০ সেকেন্ড (৫ ঘণ্টা ৫০ মিনিট) সচল থাকবে..."
-          sleep 21000 
+          echo "মেশিন এখন ২১০০০ সেকেন্ড (৫ ঘণ্টা ৪০ মিনিট) সচল থাকবে..."
+          sleep 20400 
           
           echo "মেশিন বন্ধ হওয়ার আগে শেষবারের মতো Force Sync হচ্ছে..."
           sudo rclone sync /mnt/ramdisk gdrive:MC_Data --transfers=16 --checkers=16 --drive-chunk-size=128M --buffer-size=256M --fast-list --use-mmap
