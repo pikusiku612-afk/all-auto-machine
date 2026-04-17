@@ -18,6 +18,7 @@ jobs:
           # সবার আগে টাইমজোন ঢাকা করা হলো
           sudo timedatectl set-timezone Asia/Dhaka
           echo "⏰ বর্তমান সময় (ঢাকা): $(date)"
+          
           # আপনার দেওয়া ZRAM সুপারচার্জ কমান্ড
           echo "🚀 ZRAM Setup শুরু হচ্ছে..."
           sudo apt update
@@ -107,11 +108,11 @@ jobs:
 
       - name: "৬. প্রায় ৬ ঘণ্টার (৫ ঘণ্টা ৪০ মিনিট) লাইভ উইন্ডো"
         run: |
-          echo "মেশিন এখন ২১০০০ সেকেন্ড (৫ ঘণ্টা ৪০ মিনিট) সচল থাকবে..."
+          echo "মেশিন এখন ২০৪০০ সেকেন্ড (৫ ঘণ্টা ৪০ মিনিট) সচল থাকবে..."
           sleep 20400 
           
           echo "মেশিন বন্ধ হওয়ার আগে শেষবারের মতো Force Sync হচ্ছে..."
-          sudo rclone sync /mnt/ramdisk gdrive:MC_Data --transfers=16 --checkers=16 --drive-chunk-size=128M --buffer-size=256M --fast-list --use-mmap
+          sudo rclone sync /mnt/ramdisk gdrive:MC_Data --transfers=16 --checkers=16 --drive-chunk-size=128M --buffer-size=256M --fast-list --use-mmap || true
           sleep 60
 
       - name: "৭. ওরোবোরোস লুপ ট্রিগার"
@@ -121,4 +122,3 @@ jobs:
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/dispatches \
             -d '{"event_type": "ouroboros_trigger"}'
-            
